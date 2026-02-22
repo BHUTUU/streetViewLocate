@@ -60,14 +60,14 @@ namespace StreetViewLocate
             string coordinateSystemCodeString = ACAD_CS_TO_EPSG[coordinateSystemInFile];
             if (StreetViewLocate.ps == null)
             {
-                StreetViewLocate.ps = new PaletteSet("Street View")
+                StreetViewLocate.ps = new PaletteSet("StreetView By Suman Kumar")
                 {
                     DockEnabled = DockSides.Left | DockSides.Right | DockSides.Top | DockSides.Bottom,
                     MinimumSize = new System.Drawing.Size(800, 800),
                     Style = PaletteSetStyles.ShowCloseButton | PaletteSetStyles.ShowPropertiesMenu
                 };
                 var control = new webPalatteControl(url, blockId, coordinateSystemCodeString);
-                ps.Add("SteetView By Suman Kumar", control);
+                ps.Add("StreetView By Suman Kumar", control);
             }
             ps.Visible = true;
         }
