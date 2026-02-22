@@ -52,3 +52,25 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Rider / VSCode
+.idea/
+.vscode/
+
+# ReSharper
+_ReSharper*/
+*.DotSettings.user
+
+# AutoCAD temp files
+*.bak
+*.dwl
+*.dwl2
+
+# Migration backup
+MigrationBackup/

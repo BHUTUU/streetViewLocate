@@ -34,7 +34,7 @@ namespace StreetViewLocate
             { "OSGB1936.NATIONALGRID", "27700" },
             { "WEBMERCATOR", "3857" }
         };
-        string url = string.Empty;
+        string url = "https://www.google.com/maps/";
         [CommandMethod("STREETVIEWLOCATE")]
         public void StreetViewLocateCommand()
         {
@@ -43,12 +43,6 @@ namespace StreetViewLocate
             if(!File.Exists(block_file_path))
             {
                 ed.WriteMessage($"\nBlock file not found at {block_file_path}. Please ensure the block file is placed at this location for the command to work.");
-                return;
-            }
-            var (easting, northing, picked) = GetAutoCADPoint();
-            if (!picked)
-            {
-                ed.WriteMessage("\nNo point selected. Command cancelled.");
                 return;
             }
             string coordinateSystemInFile = Autodesk.AutoCAD.ApplicationServices.Application.GetSystemVariable("CGEOCS") as string;
@@ -64,24 +58,6 @@ namespace StreetViewLocate
                 return;
             }
             string coordinateSystemCodeString = ACAD_CS_TO_EPSG[coordinateSystemInFile];
-            ed.WriteMessage($"\nDetected coordinate system: {coordinateSystemInFile} (EPSG:{coordinateSystemCodeString})");
-            try
-            {
-                int epsgCode = int.Parse(coordinateSystemCodeString);
-                var (lat, lon) = CoordinateConverter.ToWGS84(easting, northing, epsgCode);
-                ed.WriteMessage($"\nSelected point: Easting={easting}, Northing={northing}");
-                ed.WriteMessage($"\nConverted to WGS84: Latitude={lat}, Longitude={lon}");
-                url = $"https://www.google.com/maps/@{lat},{lon},3a,75y,45h,90t/data=!3m1!1e1";
-            }
-            catch (System.Exception ex)
-            {
-                ed.WriteMessage($"\nError converting coordinates: {ex.Message}");
-            }
-            blockId = PlaceBlockAtLocation(easting, northing);
-            if (blockId != ObjectId.Null)
-            {
-                ed.WriteMessage($"\nBlock placed at selected location with ObjectId: {blockId}");
-            }
             if (StreetViewLocate.ps == null)
             {
                 StreetViewLocate.ps = new PaletteSet("Street View")
@@ -91,10 +67,9 @@ namespace StreetViewLocate
                     Style = PaletteSetStyles.ShowCloseButton | PaletteSetStyles.ShowPropertiesMenu
                 };
                 var control = new webPalatteControl(url, blockId, coordinateSystemCodeString);
-                ps.Add("SteetView", control);
+                ps.Add("SteetView By Suman Kumar", control);
             }
             ps.Visible = true;
-            
         }
         public static (double x, double y, bool status) GetAutoCADPoint()
         {
@@ -156,32 +131,6 @@ namespace StreetViewLocate
                 tr.Commit();
                 doc.Editor.UpdateScreen();
             }
-        }
-        public static void DeleteStreetViewBlock(ObjectId StreetViewBlockId) //gonna use in next update!
-        {
-            if (StreetViewBlockId == ObjectId.Null)
-                return;
-            var doc = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument;
-            var db = doc.Database;
-            using (doc.LockDocument())
-            using (Transaction tr = db.TransactionManager.StartTransaction())
-            {
-                try
-                {
-                    var ent = tr.GetObject(StreetViewBlockId, OpenMode.ForWrite, false) as Entity;
-
-                    if (ent != null && !ent.IsErased)
-                    {
-                        ent.Erase();
-                    }
-                    tr.Commit();
-                }
-                catch
-                {
-                    tr.Abort();
-                }
-            }
-            StreetViewBlockId = ObjectId.Null;
         }
     }
     public static class CoordinateConverter
@@ -271,6 +220,10 @@ namespace StreetViewLocate
                 if (lat != 0 && lon != 0)
                 {
                     var (easting, northing) = CoordinateConverter.ToEastingNorthing(lat, lon, int.Parse(coordinateSystemCodeString));
+                    if (blockId.IsNull || !blockId.IsValid || blockId.IsErased)
+                    {
+                        blockId = StreetViewLocate.PlaceBlockAtLocation(easting, northing);
+                    }
                     StreetViewLocate.MoveBlock(blockId, easting, northing, (360 - heading) * Math.PI / 180);
                 }
             }
@@ -314,13 +267,10 @@ namespace StreetViewLocate
                 return;
             }
             string coordinateSystemCodeString = StreetViewLocate.ACAD_CS_TO_EPSG[coordinateSystemInFile];
-            ed.WriteMessage($"\nDetected coordinate system: {coordinateSystemInFile} (EPSG:{coordinateSystemCodeString})");
             try
             {
                 int epsgCode = int.Parse(coordinateSystemCodeString);
                 var (lat_picked, lon_picked) = CoordinateConverter.ToWGS84(easting, northing, epsgCode);
-                ed.WriteMessage($"\nSelected point: Easting={easting}, Northing={northing}");
-                ed.WriteMessage($"\nConverted to WGS84: Latitude={lat_picked}, Longitude={lon_picked}");
                 url = $"https://www.google.com/maps/@{lat_picked},{lon_picked},3a,75y,45h,90t/data=!3m1!1e1";
             }
             catch (System.Exception ex)

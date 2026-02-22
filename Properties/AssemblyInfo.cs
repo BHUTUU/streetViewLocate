@@ -8,10 +8,10 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyTitle("StreetViewLocate")]
 [assembly: AssemblyDescription("A program writtien in C# as a plugin for AutoCAD/Civil3D to get exact streetview locaton and navigate in the drawing through streetview.")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("BHUTUU")]
+[assembly: AssemblyCompany("BHUTUU By Suman Kumar")]
 [assembly: AssemblyProduct("StreetViewLocate")]
 [assembly: AssemblyCopyright("Copyright ©  2026")]
-[assembly: AssemblyTrademark("")]
+[assembly: AssemblyTrademark("BHUTUU")]
 [assembly: AssemblyCulture("")]
 
 // Setting ComVisible to false makes the types in this assembly not visible
