@@ -88,13 +88,13 @@ namespace StreetViewLocate
                 {
                     DockEnabled = DockSides.Left | DockSides.Right | DockSides.Top | DockSides.Bottom,
                     MinimumSize = new System.Drawing.Size(800, 800),
-                    Size = new System.Drawing.Size(800, 800),
                     Style = PaletteSetStyles.ShowCloseButton | PaletteSetStyles.ShowPropertiesMenu
                 };
                 var control = new webPalatteControl(url, blockId, coordinateSystemCodeString);
                 ps.Add("SteetView", control);
             }
             ps.Visible = true;
+            
         }
         public static (double x, double y, bool status) GetAutoCADPoint()
         {
@@ -114,43 +114,32 @@ namespace StreetViewLocate
         public static ObjectId PlaceBlockAtLocation(double x, double y)
         {
             string blockFilePath = block_file_path;
-            try
+            Document doc = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument;
+            using (doc.LockDocument())
             {
-                Document doc = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument;
-                using (doc.LockDocument())
+                Database db = doc.Database;
+                using (Transaction tr = db.TransactionManager.StartTransaction())
                 {
-                    Database db = doc.Database;
-                    using (Transaction tr = db.TransactionManager.StartTransaction())
+                    BlockTable bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
+                    string blockName = System.IO.Path.GetFileNameWithoutExtension(blockFilePath);
+                    if (!bt.Has(blockName))
                     {
-                        BlockTable bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
-                        string blockName = System.IO.Path.GetFileNameWithoutExtension(blockFilePath);
-                        if (!bt.Has(blockName))
+                        using (Database sourceDb = new Database(false, true))
                         {
-                            using (Database sourceDb = new Database(false, true))
-                            {
-                                sourceDb.ReadDwgFile(blockFilePath,
-                                    System.IO.FileShare.Read, true, "");
-                                db.Insert(blockName, sourceDb, false);
-                            }
-                            BlockTableRecord modelSpace = (BlockTableRecord)tr.GetObject(bt[BlockTableRecord.ModelSpace], OpenMode.ForWrite);
-                            ObjectId blockDefId = bt[blockName];
-                            BlockReference br = new BlockReference(
-                                new Autodesk.AutoCAD.Geometry.Point3d(x, y, 0),
-                                blockDefId);
-                            ObjectId newId = modelSpace.AppendEntity(br);
-                            tr.AddNewlyCreatedDBObject(br, true);
-                            tr.Commit();
-                            return newId;
+                            sourceDb.ReadDwgFile(blockFilePath, System.IO.FileShare.Read, true, "");
+                            db.Insert(blockName, sourceDb, false);
                         }
+                        bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
                     }
+                    BlockTableRecord modelSpace = (BlockTableRecord)tr.GetObject(bt[BlockTableRecord.ModelSpace], OpenMode.ForWrite);
+                    ObjectId blockDefId = bt[blockName];
+                    BlockReference br = new BlockReference(new Autodesk.AutoCAD.Geometry.Point3d(x, y, 0),blockDefId);
+                    ObjectId newId = modelSpace.AppendEntity(br);
+                    tr.AddNewlyCreatedDBObject(br, true);
+                    tr.Commit();
+                    return newId;
                 }
             }
-            catch (System.Exception ex)
-            {
-                MessageBox.Show($"Error placing block: {ex.Message}");
-                return ObjectId.Null;
-            }
-            return ObjectId.Null;
         }
         public static void MoveBlock(ObjectId blockId, double newX, double newY, double angle)
         {
@@ -167,6 +156,32 @@ namespace StreetViewLocate
                 tr.Commit();
                 doc.Editor.UpdateScreen();
             }
+        }
+        public static void DeleteStreetViewBlock(ObjectId StreetViewBlockId) //gonna use in next update!
+        {
+            if (StreetViewBlockId == ObjectId.Null)
+                return;
+            var doc = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument;
+            var db = doc.Database;
+            using (doc.LockDocument())
+            using (Transaction tr = db.TransactionManager.StartTransaction())
+            {
+                try
+                {
+                    var ent = tr.GetObject(StreetViewBlockId, OpenMode.ForWrite, false) as Entity;
+
+                    if (ent != null && !ent.IsErased)
+                    {
+                        ent.Erase();
+                    }
+                    tr.Commit();
+                }
+                catch
+                {
+                    tr.Abort();
+                }
+            }
+            StreetViewBlockId = ObjectId.Null;
         }
     }
     public static class CoordinateConverter
@@ -216,10 +231,15 @@ namespace StreetViewLocate
             this.Load += WebPaletteControl_Load;
             pickPointButton = new Button();
             pickPointButton.Text = "Pick Point";
-            pickPointButton.Dock = DockStyle.Bottom;
-            pickPointButton.Height = 40;
-            pickPointButton.Width = 20;
+            pickPointButton.Size = new System.Drawing.Size(100, 40);
+            pickPointButton.ForeColor = System.Drawing.Color.White;
+            pickPointButton.BackColor = System.Drawing.Color.Gray;
+            pickPointButton.Anchor = AnchorStyles.Left | AnchorStyles.Bottom;
             pickPointButton.Click += PickPointButton_Click;
+            this.Resize += (s, e) =>
+            {
+                pickPointButton.Location = new System.Drawing.Point(2, this.Height - pickPointButton.Height - 2);
+            };
             this.Controls.Add(pickPointButton);
             this.Controls.SetChildIndex(pickPointButton, 0);
         }
@@ -229,10 +249,7 @@ namespace StreetViewLocate
             {
                 try
                 {
-                    string userDataFolder = System.IO.Path.Combine(
-                        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                        "StreetViewLocateWebView");
-
+                    string userDataFolder = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "StreetViewLocateWebView");
                     var env = await Microsoft.Web.WebView2.Core.CoreWebView2Environment.CreateAsync(null, userDataFolder);
                     await webView.EnsureCoreWebView2Async(env);
                     webView.CoreWebView2.SourceChanged += CoreWebView2_SourceChanged;
@@ -318,6 +335,7 @@ namespace StreetViewLocate
                 blockId = StreetViewLocate.PlaceBlockAtLocation(easting, northing);
             }
             StreetViewLocate.MoveBlock(blockId, easting, northing, 0);
+            webView.Source = new Uri(newUrl);
         }
     }
 }
