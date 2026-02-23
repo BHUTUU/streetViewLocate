@@ -69,14 +69,15 @@ And you're ready to use it 🎉
 ```
 StreetViewLocate.dll
 ```
-
-4. In AutoCAD, run:
+4. Move the StreetViewBySumanKumarBHUTUU folder into C:\\Users\{yourUserName}\AppData\local\
+   
+5. In AutoCAD, run:
 
 ```
 APPLOAD
 ```
 
-5. Load the generated DLL file.
+7. Load the generated DLL file.
 
 ---
 
@@ -109,13 +110,16 @@ APPLOAD
 ```
 streetViewLocate/
 │
-├── StreetViewLocate.cs
-├── AutoCADManager.cs
-├── webPalatteControl.cs
-├── CoordinateSystemMapper.cs
-├── Setup/
+├── Properties/
+├── StreetViewBySumanKumarBHUTUU/
+├── setup/
+├── .gitignore
+├── LICENSE
 ├── README.md
-└── LICENSE
+├── StreetViewLocate.cs
+├── StreetViewLocate.csproj
+├── StreetViewLocate.slnx
+└── app.config
 ```
 
 ---
