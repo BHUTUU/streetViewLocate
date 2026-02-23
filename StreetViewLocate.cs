@@ -48,7 +48,7 @@ namespace StreetViewLocate
             string coordinateSystemInFile = Autodesk.AutoCAD.ApplicationServices.Application.GetSystemVariable("CGEOCS") as string;
             if (string.IsNullOrEmpty(coordinateSystemInFile))
             {
-                ed.WriteMessage("\nCoordinate system not found in drawing.");
+                ed.WriteMessage("\nNo coordinate system found in this doc, please set using \"EDITDRAWINGSETTINGS\" command in Civil3D only.");
                 return;
             }
             coordinateSystemInFile = coordinateSystemInFile.ToUpper();
@@ -60,14 +60,14 @@ namespace StreetViewLocate
             string coordinateSystemCodeString = ACAD_CS_TO_EPSG[coordinateSystemInFile];
             if (StreetViewLocate.ps == null)
             {
-                StreetViewLocate.ps = new PaletteSet("StreetView By Suman Kumar")
+                StreetViewLocate.ps = new PaletteSet("STREETVIEWLOCATE BY SUMAN KUMAR")
                 {
                     DockEnabled = DockSides.Left | DockSides.Right | DockSides.Top | DockSides.Bottom,
                     MinimumSize = new System.Drawing.Size(800, 800),
                     Style = PaletteSetStyles.ShowCloseButton | PaletteSetStyles.ShowPropertiesMenu
                 };
                 var control = new webPalatteControl(url, blockId, coordinateSystemCodeString);
-                ps.Add("StreetView By Suman Kumar", control);
+                ps.Add("STREETVIEWLOCATE BY SUMAN KUMAR", control);
             }
             ps.Visible = true;
         }
@@ -182,12 +182,12 @@ namespace StreetViewLocate
             pickPointButton.Text = "Pick Point";
             pickPointButton.Size = new System.Drawing.Size(100, 40);
             pickPointButton.ForeColor = System.Drawing.Color.White;
-            pickPointButton.BackColor = System.Drawing.Color.Gray;
+            pickPointButton.BackColor = System.Drawing.Color.Blue;
             pickPointButton.Anchor = AnchorStyles.Left | AnchorStyles.Bottom;
             pickPointButton.Click += PickPointButton_Click;
             this.Resize += (s, e) =>
             {
-                pickPointButton.Location = new System.Drawing.Point(2, this.Height - pickPointButton.Height - 2);
+                pickPointButton.Location = new System.Drawing.Point(1, this.Height - pickPointButton.Height - 1);
             };
             this.Controls.Add(pickPointButton);
             this.Controls.SetChildIndex(pickPointButton, 0);
@@ -257,7 +257,7 @@ namespace StreetViewLocate
             string coordinateSystemInFile = Autodesk.AutoCAD.ApplicationServices.Application.GetSystemVariable("CGEOCS") as string;
             if (string.IsNullOrEmpty(coordinateSystemInFile))
             {
-                ed.WriteMessage("\nCoordinate system not found in drawing.");
+                ed.WriteMessage("\nNo coordinate system found in this doc, please set using \"EDITDRAWINGSETTINGS\" command in Civil3D only.");
                 return;
             }
             coordinateSystemInFile = coordinateSystemInFile.ToUpper();
