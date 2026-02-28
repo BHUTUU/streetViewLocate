@@ -157,10 +157,6 @@ class SetupApp:
             messagebox.showwarning("Warning", "You must accept the agreement.")
             return
 
-        if not self.detect_autocad():
-            messagebox.showerror("Error", "AutoCAD 2025 not detected.")
-            return
-
         if self.is_already_installed():
             messagebox.showinfo("Info", "Latest version already installed.")
             return
@@ -351,13 +347,13 @@ class SetupApp:
     # AUTOCAD DETECTION
     # =====================================================
 
-    def detect_autocad(self):
-        try:
-            key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
-                                 r"SOFTWARE\Autodesk\AutoCAD\R24.2")
-            return True
-        except:
-            return False
+    # def detect_autocad(self):
+    #     try:
+    #         key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
+    #                              r"SOFTWARE\Autodesk\AutoCAD\R24.2")
+    #         return True
+    #     except:
+    #         return False
 
     # =====================================================
     # VERSION CHECK
