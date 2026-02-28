@@ -17,10 +17,9 @@ namespace StreetViewLocate
 {
     public class StreetViewLocate
     {
-        private static PaletteSet ps;
-        private static WebView2 webView;
-        private static string block_file_path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "StreetViewBySumanKumarBHUTUU", "streetViewLocate_block.dwg");
-        private ObjectId blockId = ObjectId.Null;
+        public static PaletteSet ps;
+        public static WebView2 webView;
+        public static string block_file_path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "StreetViewBySumanKumarBHUTUU", "streetViewLocate_block.dwg");
         public static readonly Dictionary<string, string> ACAD_CS_TO_EPSG = new Dictionary<string, string>
         {
             { "UTM84-40N", "32640" },
@@ -40,7 +39,7 @@ namespace StreetViewLocate
         {
             Document doc = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument;
             Editor ed = doc.Editor;
-            if(!File.Exists(block_file_path))
+            if (!File.Exists(block_file_path))
             {
                 ed.WriteMessage($"\nBlock file not found at {block_file_path}. Please ensure the block file is placed at this location for the command to work.");
                 return;
@@ -66,8 +65,15 @@ namespace StreetViewLocate
                     MinimumSize = new System.Drawing.Size(800, 800),
                     Style = PaletteSetStyles.ShowCloseButton | PaletteSetStyles.ShowPropertiesMenu
                 };
-                var control = new webPalatteControl(url, blockId, coordinateSystemCodeString);
+                var control = new webPalatteControl(url);
                 ps.Add("STREETVIEWLOCATE BY SUMAN KUMAR", control);
+                ps.StateChanged += (sender, e) =>
+                {
+                    if (e.NewState == StateEventIndex.Hide)
+                    {
+                        StreetViewLocate.DeleteAllStreetViewBlocks();
+                    }
+                };
             }
             ps.Visible = true;
         }
@@ -108,7 +114,7 @@ namespace StreetViewLocate
                     }
                     BlockTableRecord modelSpace = (BlockTableRecord)tr.GetObject(bt[BlockTableRecord.ModelSpace], OpenMode.ForWrite);
                     ObjectId blockDefId = bt[blockName];
-                    BlockReference br = new BlockReference(new Autodesk.AutoCAD.Geometry.Point3d(x, y, 0),blockDefId);
+                    BlockReference br = new BlockReference(new Autodesk.AutoCAD.Geometry.Point3d(x, y, 0), blockDefId);
                     ObjectId newId = modelSpace.AppendEntity(br);
                     tr.AddNewlyCreatedDBObject(br, true);
                     tr.Commit();
@@ -119,6 +125,9 @@ namespace StreetViewLocate
         public static void MoveBlock(ObjectId blockId, double newX, double newY, double angle)
         {
             Document doc = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument;
+            if(doc == null) return;
+            if(blockId.IsNull || !blockId.IsValid || blockId.IsErased) return;
+            if(blockId.Database != doc.Database) return;
             using (doc.LockDocument())
             using (Transaction tr = doc.Database.TransactionManager.StartTransaction())
             {
@@ -127,6 +136,32 @@ namespace StreetViewLocate
                 {
                     br.Position = new Autodesk.AutoCAD.Geometry.Point3d(newX, newY, 0);
                     br.Rotation = angle;
+                }
+                tr.Commit();
+                doc.Editor.UpdateScreen();
+            }
+        }
+        public static void DeleteAllStreetViewBlocks()
+        {
+            Document doc = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument;
+            if (doc == null) return;
+            using (doc.LockDocument())
+            using (Transaction tr = doc.Database.TransactionManager.StartTransaction())
+            {
+                BlockTable bt = (BlockTable)tr.GetObject(doc.Database.BlockTableId, OpenMode.ForRead);
+                string blockName = Path.GetFileNameWithoutExtension(block_file_path);
+                if (!bt.Has(blockName))
+                {
+                    tr.Commit();
+                    return;
+                }
+                ObjectId blockDefId = bt[blockName];
+                BlockTableRecord blockDef = (BlockTableRecord)tr.GetObject(blockDefId, OpenMode.ForRead);
+                ObjectIdCollection refs = blockDef.GetBlockReferenceIds(true, false);
+                foreach (ObjectId refId in refs)
+                {
+                    Entity ent = tr.GetObject(refId, OpenMode.ForWrite) as Entity;
+                    ent?.Erase();
                 }
                 tr.Commit();
                 doc.Editor.UpdateScreen();
@@ -166,12 +201,28 @@ namespace StreetViewLocate
         private string url = string.Empty;
         private ObjectId blockId;
         private Button pickPointButton;
-        private string coordinateSystemCodeString;
-        public webPalatteControl(string url_string, ObjectId block_ref_id, string cooridnate_system_string)
+        public ObjectId BlockId { get => blockId;}
+        public int GetCurrentDrawingEPSG()
+        {
+            Document doc = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument;
+            string coordinateSystemInFile = Autodesk.AutoCAD.ApplicationServices.Application.GetSystemVariable("CGEOCS") as string;
+            if (string.IsNullOrEmpty(coordinateSystemInFile))
+            {
+                MessageBox.Show("\nNo coordinate system found in this doc, please set using \"EDITDRAWINGSETTINGS\" command in Civil3D only.");
+                return -1;
+            }
+            coordinateSystemInFile = coordinateSystemInFile.ToUpper();
+            if (!StreetViewLocate.ACAD_CS_TO_EPSG.ContainsKey(coordinateSystemInFile))
+            {
+                MessageBox.Show($"\nCoordinate system '{coordinateSystemInFile}' is not supported. Please contact - Suman Kumar (bhutuu.github.io) so that he can add it.");
+                return -1;
+            }
+            string coordinateSystemCodeString = StreetViewLocate.ACAD_CS_TO_EPSG[coordinateSystemInFile];
+            return int.Parse(coordinateSystemCodeString);
+        }
+        public webPalatteControl(string url_string)
         {
             url = url_string;
-            blockId = block_ref_id;
-            coordinateSystemCodeString = cooridnate_system_string;
             this.Dock = DockStyle.Fill;
             this.BackColor = System.Drawing.SystemColors.Control;
             webView = new WebView2();
@@ -219,7 +270,9 @@ namespace StreetViewLocate
                 var(lat, lon, heading, pitch) = parseLatLongHeadingPitchFromStreetViewUrl(currentUrl);
                 if (lat != 0 && lon != 0)
                 {
-                    var (easting, northing) = CoordinateConverter.ToEastingNorthing(lat, lon, int.Parse(coordinateSystemCodeString));
+                    int epsgCode = GetCurrentDrawingEPSG();
+                    if (epsgCode == -1) return;
+                    var (easting, northing) = CoordinateConverter.ToEastingNorthing(lat, lon, epsgCode);
                     if (blockId.IsNull || !blockId.IsValid || blockId.IsErased)
                     {
                         blockId = StreetViewLocate.PlaceBlockAtLocation(easting, northing);
@@ -248,42 +301,23 @@ namespace StreetViewLocate
             Editor ed = doc.Editor;
             if (doc == null)
                 return;
+            if (!blockId.IsNull)
+            {
+                if (blockId.Database != doc.Database)
+                    blockId = ObjectId.Null;
+            }
             var (easting, northing, picked) = StreetViewLocate.GetAutoCADPoint();
             if (!picked)
             {
                 ed.WriteMessage("\nNo point selected.");
                 return;
             }
-            string coordinateSystemInFile = Autodesk.AutoCAD.ApplicationServices.Application.GetSystemVariable("CGEOCS") as string;
-            if (string.IsNullOrEmpty(coordinateSystemInFile))
-            {
-                ed.WriteMessage("\nNo coordinate system found in this doc, please set using \"EDITDRAWINGSETTINGS\" command in Civil3D only.");
-                return;
-            }
-            coordinateSystemInFile = coordinateSystemInFile.ToUpper();
-            if (!StreetViewLocate.ACAD_CS_TO_EPSG.ContainsKey(coordinateSystemInFile))
-            {
-                ed.WriteMessage($"\nCoordinate system '{coordinateSystemInFile}' is not supported. Please contact - Suman Kumar so that he can add it.");
-                return;
-            }
-            string coordinateSystemCodeString = StreetViewLocate.ACAD_CS_TO_EPSG[coordinateSystemInFile];
-            try
-            {
-                int epsgCode = int.Parse(coordinateSystemCodeString);
-                var (lat_picked, lon_picked) = CoordinateConverter.ToWGS84(easting, northing, epsgCode);
-                url = $"https://www.google.com/maps/@{lat_picked},{lon_picked},3a,75y,45h,90t/data=!3m1!1e1";
-            }
-            catch (System.Exception ex)
-            {
-                ed.WriteMessage($"\nError converting coordinates: {ex.Message}");
-            }
-            (double lat, double lon) = CoordinateConverter.ToWGS84(easting, northing, int.Parse(coordinateSystemCodeString));
+            int epsgCode = GetCurrentDrawingEPSG();
+            if (epsgCode == -1) return;
+            (double lat, double lon) = CoordinateConverter.ToWGS84(easting, northing, epsgCode);
             string newUrl =$"https://www.google.com/maps/@{lat},{lon},3a,75y,45h,90t/data=!3m1!1e1";
-
-            if(blockId.IsNull || !blockId.IsValid || blockId.IsErased)
-            {
-                blockId = StreetViewLocate.PlaceBlockAtLocation(easting, northing);
-            }
+            StreetViewLocate.DeleteAllStreetViewBlocks();
+            blockId = StreetViewLocate.PlaceBlockAtLocation(easting, northing);
             StreetViewLocate.MoveBlock(blockId, easting, northing, 0);
             webView.Source = new Uri(newUrl);
         }

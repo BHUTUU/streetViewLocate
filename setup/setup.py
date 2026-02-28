@@ -298,7 +298,7 @@ class SetupApp:
         xml_content = f"""<?xml version="1.0" encoding="utf-8"?>
 <ApplicationPackage
     SchemaVersion="1.0"
-    AutodeskProduct="AutoCAD"
+    AutodeskProduct="AutoCAD|Civil3D"
     Name="{APP_NAME}"
     Description="Street View Locate Plugin for AutoCAD"
     AppVersion="{APP_VERSION}"
@@ -311,9 +311,8 @@ class SetupApp:
 
     <RuntimeRequirements
         OS="Win64"
-        Platform="AutoCAD"
         SeriesMin="R24.2"
-        SeriesMax="R25.0" />
+        SeriesMax="R25.1" />
 
     <ComponentEntry
         AppName="{APP_NAME}"
