@@ -344,18 +344,6 @@ class SetupApp:
                    command=self.root.quit).pack(pady=20)
 
     # =====================================================
-    # AUTOCAD DETECTION
-    # =====================================================
-
-    # def detect_autocad(self):
-    #     try:
-    #         key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
-    #                              r"SOFTWARE\Autodesk\AutoCAD\R24.2")
-    #         return True
-    #     except:
-    #         return False
-
-    # =====================================================
     # VERSION CHECK
     # =====================================================
 
@@ -395,7 +383,6 @@ icon_base = b'AAABAAEAICAAAAEAIACoEAAAFgAAACgAAAAgAAAAQAAAAAEAIAAAAAAAABAAAAAAAA
 
 if __name__ == "__main__":
     APP_VERSION = SetupApp.get_latest_version()
-    print(APP_VERSION)
     icon_path = write_icon_to_temp(icon_base)
     root = tk.Tk()
     root.iconbitmap(icon_path)
