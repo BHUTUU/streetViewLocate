@@ -246,6 +246,10 @@ class SetupApp:
         bundle_path = os.path.join(programdata, APP_NAME + ".bundle")
         win64_path = os.path.join(bundle_path, "Contents", "Win64")
 
+        if os.path.exists(bundle_path):
+            self.update_status("Removing previous version...")
+            shutil.rmtree(bundle_path)
+
         os.makedirs(win64_path, exist_ok=True)
 
         self.update_status("Fetching release info...")
@@ -283,6 +287,8 @@ class SetupApp:
         self.update_status("Writing PackageContents.xml...")
         self.write_full_package_xml(bundle_path)
 
+        self.download_cuix(programdata)
+
         shutil.rmtree(self.temp_dir)
 
     # =====================================================
@@ -296,7 +302,7 @@ class SetupApp:
     SchemaVersion="1.0"
     AutodeskProduct="AutoCAD|Civil3D"
     Name="{APP_NAME}"
-    Description="Street View Locate Plugin for AutoCAD"
+    Description="Street View Locate Plugin for AutoCAD/CIVIL 3D"
     AppVersion="{APP_VERSION}"
     Author="Suman Kumar"
     ProductType="Application">
@@ -323,6 +329,23 @@ class SetupApp:
 
         with open(os.path.join(bundle_path, "PackageContents.xml"), "w", encoding="utf-8") as f:
             f.write(xml_content)
+
+    # =====================================================
+    # DOWNLOAD CUIX
+    # =====================================================
+
+    def download_cuix(self, programdata):
+        self.update_status("Downloading customization file...")
+        url = "https://raw.githubusercontent.com/BHUTUU/streetViewLocate/main/setup/bhutuu.cuix"
+        response = requests.get(url)
+        if response.status_code == 200:
+            cuix_path = os.path.join(programdata, "bhutuu.cuix")
+            if os.path.exists(cuix_path):
+                os.remove(cuix_path)
+            with open(cuix_path, "wb") as f:
+                f.write(response.content)
+        else:
+            raise Exception("Failed to download cuix file.")
 
     # =====================================================
     # FINISH PAGE
