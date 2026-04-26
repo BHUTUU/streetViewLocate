@@ -10,7 +10,9 @@ using ProjNet.CoordinateSystems.Transformations;
 using ProjNet.SRID;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.IO;
+using System.Linq;
 using System.Windows.Forms;
 
 namespace StreetViewLocate
@@ -20,7 +22,8 @@ namespace StreetViewLocate
         public static PaletteSet ps;
         public static WebView2 webView;
         public static string block_file_path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "StreetViewBySumanKumarBHUTUU", "streetViewLocate_block.dwg");
-        public static readonly Dictionary<string, string> ACAD_CS_TO_EPSG = new Dictionary<string, string>
+        public static string config_file_path = Path.Combine("C:\\ProgramData\\Autodesk\\ApplicationPlugins\\StreetViewLocate.bundle", "streetViewLocate_configuration.json");
+        public static Dictionary<string, string> ACAD_CS_TO_EPSG = new Dictionary<string, string>
         {
             { "UTM84-40N", "32640" },
             { "UTM84-41N", "32641" },
@@ -33,6 +36,7 @@ namespace StreetViewLocate
             { "OSGB1936.NATIONALGRID", "27700" },
             { "WEBMERCATOR", "3857" }
         };
+        public static bool WarningWindowWhenFailed = true;
         string url = "https://www.google.com/maps/";
         [CommandMethod("STREETVIEWLOCATE")]
         public void StreetViewLocateCommand()
@@ -53,8 +57,23 @@ namespace StreetViewLocate
             coordinateSystemInFile = coordinateSystemInFile.ToUpper();
             if (!ACAD_CS_TO_EPSG.ContainsKey(coordinateSystemInFile))
             {
-                ed.WriteMessage($"\nCoordinate system '{coordinateSystemInFile}' is not supported. Please contact - Suman Kumar (bhutuu.github.io) so that he can add it.");
-                return;
+                Dictionary<string, string> ACAD_CS_TO_EPSG_backup = ACAD_CS_TO_EPSG;
+                WarningWindowWhenFailed = false;
+                ReloadStreetViewConfigs();
+                WarningWindowWhenFailed = true;
+                if (!ACAD_CS_TO_EPSG.ContainsKey(coordinateSystemInFile))
+                {
+                    ed.WriteMessage($"\nCoordinate system '{coordinateSystemInFile}' is not supported. Please contact - Suman Kumar (suman.bhutuu@gmail.com) so that he can add it.");
+                    return;
+                }
+                else
+                {
+                    foreach (var pair in ACAD_CS_TO_EPSG)
+                    {
+                        if(pair.Key.ToUpper() == coordinateSystemInFile)
+                            ACAD_CS_TO_EPSG.Add(pair.Key.ToUpper(), pair.Value);
+                    }
+                }
             }
             string coordinateSystemCodeString = ACAD_CS_TO_EPSG[coordinateSystemInFile];
             if (StreetViewLocate.ps == null)
@@ -167,6 +186,70 @@ namespace StreetViewLocate
                 doc.Editor.UpdateScreen();
             }
         }
+        [CommandMethod("OPENSTREETVIEWCONFIGFILE")]
+        public void OpenStreetViewConfigFile()
+        {
+            if (!File.Exists(config_file_path))
+            {
+                MessageBox.Show($"\nOh ho! The config file is not there at {config_file_path}. Let me create it again with existing settings.");
+                string defaultConfigContent = "{\n  \"ACAD_CS_TO_EPSG\": {\n    \"UTM84-40N\": \"32640\",\n    \"UTM84-41N\": \"32641\",\n    \"UTM84-42N\": \"32642\",\n    \"UTM84-43N\": \"32643\",\n    \"UTM84-44N\": \"32644\",\n    \"UTM84-45N\": \"32645\",\n    \"WGS84\": \"4326\",\n    \"BRITISHNATGRID\": \"27700\",\n    \"OSGB1936.NATIONALGRID\": \"27700\",\n    \"WEBMERCATOR\": \"3857\"\n  }\n}";
+                Directory.CreateDirectory(Path.GetDirectoryName(config_file_path));
+                File.WriteAllText(config_file_path, defaultConfigContent);
+                MessageBox.Show("\nConfig file created. You can edit the config file to add support for more coordinate systems. Please contact - Suman Kumar (suman.bhutuu@gmail.com) if you need any further support.");
+                System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{config_file_path}\"");
+                return;
+            }
+            System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{config_file_path}\"");
+        }
+        [CommandMethod("RESETSTREETVIEWCONFIGTODEFAULT")]
+        public void ResetStreetViewConfigToDefault()
+        {
+            if (File.Exists(config_file_path))
+            {
+                DialogResult result = MessageBox.Show("\nAre you sure you want to reset the config to default? This will overwrite any changes you have made to the config file.", "Confirm Reset", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+                if (result == DialogResult.No)
+                {
+                    return;
+                }
+            }
+            string defaultConfigContent = "{\n  \"ACAD_CS_TO_EPSG\": {\n    \"UTM84-40N\": \"32640\",\n    \"UTM84-41N\": \"32641\",\n    \"UTM84-42N\": \"32642\",\n    \"UTM84-43N\": \"32643\",\n    \"UTM84-44N\": \"32644\",\n    \"UTM84-45N\": \"32645\",\n    \"WGS84\": \"4326\",\n    \"BRITISHNATGRID\": \"27700\",\n    \"OSGB1936.NATIONALGRID\": \"27700\",\n    \"WEBMERCATOR\": \"3857\"\n  }\n}";
+            Directory.CreateDirectory(Path.GetDirectoryName(config_file_path));
+            File.WriteAllText(config_file_path, defaultConfigContent);
+            WarningWindowWhenFailed = false;
+            ReloadStreetViewConfigs();
+            WarningWindowWhenFailed = true;
+            MessageBox.Show("\nConfig reset to default. Please contact - Suman Kumar (suman.bhutuu@gmail.com) if you need any further support.");
+
+        }
+        [CommandMethod("RELOADSTREETVIEWCONFIGS")]
+        public void ReloadStreetViewConfigs()
+        {
+            if (!File.Exists(config_file_path))
+            {
+                if(WarningWindowWhenFailed) MessageBox.Show($"\nConfig file not found at {config_file_path}. Please create or restore the config file and then try reloading. Run 'OPENSTREETVIEWCONFIGFILE' to open or recreate it.");
+                return;
+            }
+            try
+            {
+                string configContent = File.ReadAllText(config_file_path);
+                var configJson = Newtonsoft.Json.Linq.JObject.Parse(configContent);
+                var csToEpsg = configJson["ACAD_CS_TO_EPSG"] as Newtonsoft.Json.Linq.JObject;
+                if (csToEpsg != null)
+                {
+                    ACAD_CS_TO_EPSG.Clear();
+                    foreach (var pair in csToEpsg)
+                    {
+                        ACAD_CS_TO_EPSG[pair.Key.ToUpper()] = pair.Value.ToString();
+                    }
+                }
+            }
+            catch (System.Exception ex)
+            {
+                if (WarningWindowWhenFailed) MessageBox.Show($"\nError reading config file: {ex.Message}. Need help? contact - Suman Kumar (suman.bhutuu@gmail.com)");
+                return;
+            }
+            if (WarningWindowWhenFailed)  MessageBox.Show("\nConfigurations reloaded.");
+        }
     }
     public static class CoordinateConverter
     {
@@ -208,13 +291,13 @@ namespace StreetViewLocate
             string coordinateSystemInFile = Autodesk.AutoCAD.ApplicationServices.Application.GetSystemVariable("CGEOCS") as string;
             if (string.IsNullOrEmpty(coordinateSystemInFile))
             {
-                MessageBox.Show("\nNo coordinate system found in this doc, please set using \"EDITDRAWINGSETTINGS\" command in Civil3D only.");
+                MessageBox.Show("\nNo coordinate system found in this doc, please set using \"EDITDRAWINGSETTINGS\" command in Civil3D.");
                 return -1;
             }
             coordinateSystemInFile = coordinateSystemInFile.ToUpper();
             if (!StreetViewLocate.ACAD_CS_TO_EPSG.ContainsKey(coordinateSystemInFile))
             {
-                MessageBox.Show($"\nCoordinate system '{coordinateSystemInFile}' is not supported. Please contact - Suman Kumar (bhutuu.github.io) so that he can add it.");
+                MessageBox.Show($"\nCoordinate system '{coordinateSystemInFile}' is not supported. Please contact - Suman Kumar (suman.bhutuu@gmail.com) so that he can add it.");
                 return -1;
             }
             string coordinateSystemCodeString = StreetViewLocate.ACAD_CS_TO_EPSG[coordinateSystemInFile];
