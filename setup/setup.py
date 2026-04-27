@@ -288,6 +288,7 @@ class SetupApp:
         self.write_full_package_xml(bundle_path)
 
         self.download_cuix(programdata)
+        self.write_cuix_autoload_lisp(programdata)
 
         shutil.rmtree(self.temp_dir)
 
@@ -346,6 +347,68 @@ class SetupApp:
                 f.write(response.content)
         else:
             raise Exception("Failed to download cuix file.")
+        
+    # =====================================================
+    # CUIX AUTOLOAD LISP
+    # =====================================================
+
+    def write_cuix_autoload_lisp(self, programdata):
+        self.update_status("Configuring AutoCAD to load customization...")
+        cui_autoload_script = """
+(defun loadMyCUIX ( / cuixName cuixPath loaded )
+
+  ;;<<<-----------set your cuix group name----------->>>
+  (setq cuixName "BHUTUU")
+
+  ;;<<<-----------full path----------->>>
+  (setq cuixPath "C:\\\\ProgramData\\\\Autodesk\\\\ApplicationPlugins\\\\bhutuu.cuix")
+
+  ;;<<<-----------get loaded menu groups----------->>>
+  (vl-load-com)
+  (setq loaded nil)
+
+  (vlax-for g (vla-get-MenuGroups (vlax-get-acad-object))
+    (if (= (strcase (vla-get-Name g)) (strcase cuixName))
+      (setq loaded T)
+    )
+  )
+
+  ;;<<<-----------load if not loaded----------->>>
+  (if (not loaded)
+    (progn
+      (command "_.cuiload" cuixPath)
+      (princ (strcat "\\nLoaded CUIX: " cuixName))
+    )
+    (princ (strcat "\\nCUIX already loaded: " cuixName))
+  )
+
+  (princ)
+)
+;;<<<-----------RUN AT CORRECT TIME----------->>>
+(defun S::STARTUP ()
+  (loadMyCUIX)
+)"""
+        r_versions = ["R24.2", "R24.3", "R25.0"]
+        all_autocad_years = ["2023", "2024", "2025"]
+        for r, y in zip(r_versions, all_autocad_years):
+            print(f"Configuring for AutoCAD {y} ({r})...")
+            support_folder_path = os.path.join(os.path.expandvars("%APPDATA%"), f"Autodesk\\AutoCAD {y}\\{r}\\enu\\Support")
+            print(f"Looking for support folder at: {support_folder_path}")
+            if os.path.exists(support_folder_path):
+                print(f"Found support folder: {support_folder_path}")
+                lisp_path = os.path.join(support_folder_path, "acad.lsp")
+                if os.path.exists(lisp_path):
+                    print(f"Found existing acad.lsp at: {lisp_path}")
+                    with open(lisp_path, "r", encoding="utf-8") as f:
+                        content = f.read()
+                    if cui_autoload_script not in content:
+                        print("Appending autoload command to existing acad.lsp...")
+                        with open(lisp_path, "a", encoding="utf-8") as f:
+                            f.write("\n" + cui_autoload_script + "\n")
+                else:
+                    print(f"No acad.lsp found. Creating new one at: {lisp_path}")
+                    with open(lisp_path, "w", encoding="utf-8") as f:
+                        f.write(cui_autoload_script + "\n")
 
     # =====================================================
     # FINISH PAGE
